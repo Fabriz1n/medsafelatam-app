@@ -25,6 +25,28 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Supabase, pagos QR y administración
+
+La app utiliza Supabase Auth para las cuentas y PostgreSQL para perfiles y solicitudes. Para conectar un proyecto:
+
+1. Crea un proyecto en Supabase y ejecuta `supabase/migrations/202610120001_payment_approval.sql` desde el SQL Editor.
+2. Copia `.env.example` a `.env` y configura `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` con los valores públicos de tu proyecto. No incluyas una clave `service_role` en la app ni en el portal.
+3. Crea la cuenta del administrador con correo y contraseña. Desde el SQL Editor, asígnale el rol administrativo sustituyendo el correo:
+
+   ```sql
+   update auth.users
+   set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
+     || '{"role":"admin"}'::jsonb
+   where email = 'admin@example.com';
+   ```
+
+   Cierra sesión y vuelve a ingresar para que se renueve el token con el rol. El panel web se encuentra en `/admin`; solo cuentas con `app_metadata.role = 'admin'` pueden consultar usuarios o aprobar solicitudes.
+4. Ejecuta `npx expo start` para desarrollo o `npx expo export --platform web` para generar el portal y la app web. Al publicar el sitio, configura el hosting para servir la ruta `/admin` desde la salida estática.
+
+El QR del Banco Ganadero es estático y no verifica transacciones. La app registra la solicitud con el monto del plan y abre WhatsApp para que el usuario adjunte el comprobante. El plan permanece bloqueado hasta que un administrador lo apruebe en `/admin`; al volver a Planes, el usuario puede actualizar el estado. La aprobación y la lectura de usuarios están protegidas por políticas RLS en la migración.
+
+Las cuentas locales anteriores no se sincronizan con Supabase: los usuarios deben registrarse de nuevo con correo electrónico. El progreso de estudio sigue guardándose localmente en el dispositivo.
+
 ## Get a fresh project
 
 When you're ready, run:
