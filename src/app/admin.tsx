@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
-import type { Session } from '@supabase/supabase-js';
 import { supabase, type PaymentRequest, type Profile } from '../lib/supabase';
 
 const colors = {
@@ -20,6 +20,19 @@ const colors = {
 };
 
 const planNames = { free: 'Free', regular: 'Regular', pro: 'Pro' };
+
+const getLoginErrorMessage = (code: string | undefined, message: string) => {
+  if (code === 'invalid_credentials') {
+    return 'Supabase no pudo validar el correo y la contraseña. Verifica que la cuenta exista en el mismo proyecto de Supabase que usa la app y restablece la contraseña si es necesario.';
+  }
+  if (code === 'email_not_confirmed') {
+    return 'El correo de esta cuenta todavía no está confirmado. Confírmalo desde el enlace enviado por Supabase y vuelve a intentarlo.';
+  }
+  if (code === 'over_request_rate_limit') {
+    return 'Se realizaron demasiados intentos. Espera unos minutos antes de volver a iniciar sesión.';
+  }
+  return `No se pudo iniciar sesión: ${message}`;
+};
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
@@ -96,7 +109,7 @@ export default function AdminPage() {
     };
   }, [loadDashboard]);
 
-  const signIn = async () => {
+  const handleAdminLogin = async () => {
     const client = supabase;
     if (!client) {
       setErrorMessage('Configura Supabase antes de abrir el panel.');
@@ -104,22 +117,31 @@ export default function AdminPage() {
     }
     setLoading(true);
     setErrorMessage('');
-    const { data, error } = await client.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      setErrorMessage(error.message);
-      return;
+    try {
+      const { data, error } = await client.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (error) {
+        setErrorMessage(getLoginErrorMessage(error.code, error.message));
+        return;
+      }
+      if (data.user?.app_metadata.role !== 'admin') {
+        const { error: signOutError } = await client.auth.signOut();
+        setErrorMessage(
+          signOutError
+            ? `La cuenta inició sesión, pero no tiene el rol admin en app_metadata.role. Asígnalo en Supabase Authentication y vuelve a ingresar. ${signOutError.message}`
+            : 'La cuenta inició sesión, pero no tiene el rol admin en app_metadata.role. Asígnalo en Supabase Authentication y vuelve a ingresar.',
+        );
+        return;
+      }
+      setSession(data.session);
+      await loadDashboard();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
+    } finally {
+      setLoading(false);
     }
-    if (data.user?.app_metadata.role !== 'admin') {
-      await client.auth.signOut();
-      setErrorMessage('Esta cuenta no tiene permisos de administrador.');
-      return;
-    }
-    setSession(data.session);
-    await loadDashboard();
   };
 
   const approvePayment = async (requestId: string) => {
@@ -177,7 +199,7 @@ export default function AdminPage() {
               placeholderTextColor={colors.muted}
             />
             {errorMessage || !supabase ? <Text style={styles.error}>{errorMessage || 'Configura Supabase antes de abrir el panel.'}</Text> : null}
-            <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()} disabled={loading}>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => void handleAdminLogin()} disabled={loading}>
               <Text style={styles.primaryButtonText}>{loading ? 'Ingresando…' : 'Ingresar al panel'}</Text>
             </TouchableOpacity>
           </View>
@@ -230,13 +252,13 @@ export default function AdminPage() {
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Usuarios ({profiles.length})</Text>
               {profiles.map((profile) => (
-                <View key={profile.id} style={styles.userRow}>
-                  <View style={styles.userCopy}>
-                    <Text style={styles.body}>{profile.display_name}</Text>
-                    <Text style={styles.muted}>{profile.email}</Text>
+                  <View key={profile.id} style={styles.userRow}>
+                    <View style={styles.userCopy}>
+                      <Text style={styles.body}>{profile.display_name}</Text>
+                      <Text style={styles.muted}>{profile.email}</Text>
                   </View>
                   <Text style={styles.userPlan}>{planNames[profile.plan]}</Text>
-                </View>
+            </View>
               ))}
             </View>
           </>

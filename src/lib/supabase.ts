@@ -12,6 +12,7 @@ export type Profile = {
   email: string;
   display_name: string;
   plan: Plan;
+  plan_expires_at: string | null;
   created_at: string;
 };
 
@@ -25,6 +26,16 @@ export type PaymentRequest = {
   reviewed_at: string | null;
 };
 
+export type QuestionOverride = {
+  question_id: string;
+  specialty: string;
+  question_text: string;
+  options: string[];
+  correct_index: number;
+  explanation: string | null;
+  updated_at: string;
+};
+
 type Database = {
   public: {
     Tables: {
@@ -35,6 +46,7 @@ type Database = {
           email: string;
           display_name: string;
           plan?: Plan;
+          plan_expires_at?: string | null;
           created_at?: string;
         };
         Update: Partial<Profile>;
@@ -54,6 +66,20 @@ type Database = {
         Update: Partial<PaymentRequest>;
         Relationships: [];
       };
+      question_overrides: {
+        Row: QuestionOverride;
+        Insert: {
+          question_id: string;
+          specialty: string;
+          question_text: string;
+          options: string[];
+          correct_index: number;
+          explanation?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<QuestionOverride>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -64,6 +90,13 @@ type Database = {
       approve_payment_request: {
         Args: { p_request_id: string };
         Returns: undefined;
+      };
+      admin_dashboard_metrics: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          active_paid_students: number;
+          expired_students: number;
+        }[];
       };
     };
     Enums: { [_ in never]: never };
