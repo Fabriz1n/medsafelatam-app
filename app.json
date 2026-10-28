@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.medsafalatam.MedsafeLatamAcademy"
+      "package": "com.medsafelatam.appmovil"
     },
     "web": {
       "output": "static",
